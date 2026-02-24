@@ -102,7 +102,7 @@ const MobileDivisionTrainer = () => {
                         const tens = Math.floor(d / 10), ones = d % 10;
                         if (d % divisor === 0 && Math.floor(d / divisor) >= 10 &&
                             tens % divisor === 0 && ones % divisor === 0 &&
-                            ones !== 0 && tens !== divisor)
+                            ones !== 0 && tens !== divisor && tens !== ones)
                             candidates.push(d);
                     }
                     if (candidates.length > 0) return { dividend: candidates[rnd(0, candidates.length - 1)], divisor };
