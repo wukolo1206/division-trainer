@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { RefreshCw, Check, ArrowRight, Play, Home, Trophy, Lightbulb, X, AlertCircle, RotateCcw, Info, PanelLeft, PanelTop, ZoomIn, ZoomOut, ArrowDown, Keyboard } from 'lucide-react';
 
 const MobileDivisionTrainer = () => {
@@ -54,6 +54,9 @@ const MobileDivisionTrainer = () => {
         localStorage.setItem('divisionTrainerConfig', JSON.stringify(config));
     }, [config]);
 
+
+    // --- 已出過的題目（避免重複）---
+    const usedProblemsRef = useRef(new Set());
 
     // --- 錯誤/警告視窗狀態 ---
     const [errorModal, setErrorModal] = useState({ show: false, message: '' });
@@ -205,7 +208,16 @@ const MobileDivisionTrainer = () => {
 
         // --- 課本進度模式 ---
         if (config.mode === 'textbook') {
-            const { dividend: nd, divisor: ns } = generateTextbookProblem(config.textbookActivity);
+            let nd, ns, key;
+            let tries = 0;
+            do {
+                ({ dividend: nd, divisor: ns } = generateTextbookProblem(config.textbookActivity));
+                key = `${nd}÷${ns}`;
+                tries++;
+            } while (usedProblemsRef.current.has(key) && tries < 100);
+            // 若題庫已全部用過，清空紀錄重新循環
+            if (usedProblemsRef.current.has(key)) usedProblemsRef.current.clear();
+            usedProblemsRef.current.add(key);
             setDivisor(ns);
             setDividend(nd);
             return;
@@ -247,6 +259,7 @@ const MobileDivisionTrainer = () => {
                     if (newDividend < newDivisor) continue;
                 }
             }
+            if (usedProblemsRef.current.has(`${newDividend}÷${newDivisor}`)) continue;
             isValid = true;
         }
 
@@ -255,6 +268,7 @@ const MobileDivisionTrainer = () => {
             while (newDividend < min) newDividend += newDivisor;
         }
 
+        usedProblemsRef.current.add(`${newDividend}÷${newDivisor}`);
         setDivisor(newDivisor);
         setDividend(newDividend);
     };
@@ -343,6 +357,7 @@ const MobileDivisionTrainer = () => {
             }
         }
 
+        usedProblemsRef.current = new Set();
         setProgress({ current: 1, total: config.totalQuestions, score: 0 });
         setWrongQuestions([]);
         setRetryQueue([]);
