@@ -8,6 +8,18 @@ const MobileDivisionTrainer = () => {
     const [zoomLevel, setZoomLevel] = useState(1.0);
     const [keyboardMode, setKeyboardMode] = useState(false); // 新增：鍵盤模式狀態
 
+    // --- 課本活動定義 ---
+    const TEXTBOOK_ACTIVITIES = [
+        { id: '1-1', label: '整十數 ÷ 一位數',         example: '60÷3、80÷4',    level: '活動一' },
+        { id: '1-2', label: '二位數 ÷ 一位數（整除）', example: '48÷4=12',       level: '活動一' },
+        { id: '1-3', label: '二位數 ÷ 一位數（有餘數）',example: '98÷6=16…2',   level: '活動一' },
+        { id: '2-1', label: '整百數 ÷ 一位數',         example: '800÷4=200',     level: '活動二' },
+        { id: '2-2', label: '三位數 ÷ 一位數（商三位）',example: '396÷3=132',   level: '活動二' },
+        { id: '2-3', label: '商中間有 0',               example: '624÷3=208',    level: '活動二' },
+        { id: '2-4', label: '商為二位數',               example: '465÷5=93',     level: '活動二' },
+        { id: '2-5', label: '三位數 ÷ 一位數（有餘數）',example: '809÷8=101…1', level: '活動二' },
+    ];
+
     // --- 設定選項（從 localStorage 讀取） ---
     const [config, setConfig] = useState(() => {
         try {
@@ -15,6 +27,8 @@ const MobileDivisionTrainer = () => {
             if (saved) {
                 const data = JSON.parse(saved);
                 return {
+                    mode: data.mode || 'textbook',
+                    textbookActivity: data.textbookActivity || '1-1',
                     dividendDigits: data.dividendDigits || [3],
                     forceInteger: data.forceInteger ?? false,
                     totalQuestions: data.totalQuestions || 5,
@@ -24,6 +38,8 @@ const MobileDivisionTrainer = () => {
             }
         } catch (e) {}
         return {
+            mode: 'textbook',
+            textbookActivity: '1-1',
             dividendDigits: [3],
             forceInteger: false,
             totalQuestions: 5,
@@ -58,6 +74,85 @@ const MobileDivisionTrainer = () => {
     const [showHint, setShowHint] = useState(false);
 
     // ==========================================
+    // 課本進度模式：依活動產生題目
+    // ==========================================
+    const generateTextbookProblem = (activity) => {
+        const rnd = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+        let dividend, divisor;
+
+        for (let attempts = 0; attempts < 500; attempts++) {
+            switch (activity) {
+                case '1-1': { // 整十數÷一位數（60÷3=20）
+                    divisor = rnd(2, 9);
+                    const opts = [];
+                    for (let d = 20; d <= 90; d += 10)
+                        if (d % divisor === 0) opts.push(d);
+                    if (opts.length > 0) return { dividend: opts[rnd(0, opts.length - 1)], divisor };
+                    break;
+                }
+                case '1-2': { // 二位數÷一位數（整除，商≥10）
+                    divisor = rnd(2, 9);
+                    const minD = 10 * divisor;
+                    if (minD > 99) break;
+                    const start = Math.ceil(minD / divisor) * divisor;
+                    const end = Math.floor(99 / divisor) * divisor;
+                    if (start > end) break;
+                    dividend = start + rnd(0, Math.floor((end - start) / divisor)) * divisor;
+                    if (Math.floor(dividend / divisor) >= 10) return { dividend, divisor };
+                    break;
+                }
+                case '1-3': { // 二位數÷一位數（有餘數，商≥10）
+                    divisor = rnd(2, 9);
+                    const minD = 10 * divisor;
+                    if (minD > 99) break;
+                    dividend = rnd(minD, 99);
+                    if (dividend % divisor !== 0 && Math.floor(dividend / divisor) >= 10) return { dividend, divisor };
+                    break;
+                }
+                case '2-1': { // 整百數÷一位數（800÷4=200）
+                    divisor = rnd(2, 9);
+                    const opts = [];
+                    for (let h = 1; h <= 9; h++)
+                        if ((h * 100) % divisor === 0) opts.push(h * 100);
+                    if (opts.length > 0) return { dividend: opts[rnd(0, opts.length - 1)], divisor };
+                    break;
+                }
+                case '2-2': { // 三位數÷一位數（商三位，各位非0，整除）
+                    divisor = rnd(2, 9);
+                    const q = rnd(1, 9) * 100 + rnd(1, 9) * 10 + rnd(1, 9);
+                    dividend = q * divisor;
+                    if (dividend >= 100 && dividend <= 999) return { dividend, divisor };
+                    break;
+                }
+                case '2-3': { // 商中間有0（624÷3=208，809÷8=101…1）
+                    divisor = rnd(2, 9);
+                    const q = rnd(1, 9) * 100 + rnd(1, 9); // 格式 X0Y
+                    const remainder = rnd(0, divisor - 1);
+                    dividend = q * divisor + remainder;
+                    if (dividend >= 100 && dividend <= 999) return { dividend, divisor };
+                    break;
+                }
+                case '2-4': { // 百位不夠分，商二位（465÷5=93）
+                    divisor = rnd(2, 9);
+                    const maxH = divisor - 1;
+                    if (maxH < 1) break;
+                    dividend = rnd(1, maxH) * 100 + rnd(0, 99);
+                    if (dividend >= 100 && dividend <= 999 && Math.floor(dividend / divisor) >= 10) return { dividend, divisor };
+                    break;
+                }
+                case '2-5': { // 三位數÷一位數（有餘數）
+                    divisor = rnd(2, 9);
+                    dividend = rnd(100, 999);
+                    if (dividend % divisor !== 0) return { dividend, divisor };
+                    break;
+                }
+                default: break;
+            }
+        }
+        return { dividend: 396, divisor: 3 }; // 保底
+    };
+
+    // ==========================================
     // 核心邏輯：產生題目
     // ==========================================
     const generateProblem = (customQueue = null) => {
@@ -77,7 +172,15 @@ const MobileDivisionTrainer = () => {
             return;
         }
 
-        // --- 一般模式 ---
+        // --- 課本進度模式 ---
+        if (config.mode === 'textbook') {
+            const { dividend: nd, divisor: ns } = generateTextbookProblem(config.textbookActivity);
+            setDivisor(ns);
+            setDividend(nd);
+            return;
+        }
+
+        // --- 自由練習模式 ---
         let newDivisor;
         let minDiv = parseInt(config.customDivisorMin);
         let maxDiv = parseInt(config.customDivisorMax);
@@ -175,40 +278,38 @@ const MobileDivisionTrainer = () => {
     };
 
     const startGame = () => {
-        if (config.dividendDigits.length === 0) {
-            setErrorModal({ show: true, message: "請至少選擇一種被除數位數！" });
-            return;
-        }
-        const minDiv = parseInt(config.customDivisorMin);
-        const maxDiv = parseInt(config.customDivisorMax);
-        const isCustomValid = !isNaN(minDiv) && !isNaN(maxDiv) && minDiv > 0 && maxDiv > 0;
-
-        if (!isCustomValid) {
-            setErrorModal({ show: true, message: "請輸入完整的除數範圍（最小與最大值皆須填寫且大於0）！" });
-            return;
-        }
-        if (minDiv > maxDiv) {
-            setErrorModal({ show: true, message: `除數範圍錯誤：最小值 (${minDiv}) 不能大於 最大值 (${maxDiv})！` });
-            return;
-        }
-        if (maxDiv > 999) {
-            setErrorModal({ show: true, message: "除數請勿超過 999！" });
-            return;
-        }
-
-        const invalidDigits = [];
-        config.dividendDigits.forEach(digit => {
-            const maxValOfDigit = Math.pow(10, digit) - 1;
-            if (maxValOfDigit < minDiv) {
-                invalidDigits.push(`${digit}位`);
+        if (config.mode === 'free') {
+            if (config.dividendDigits.length === 0) {
+                setErrorModal({ show: true, message: "請至少選擇一種被除數位數！" });
+                return;
             }
-        });
+            const minDiv = parseInt(config.customDivisorMin);
+            const maxDiv = parseInt(config.customDivisorMax);
+            const isCustomValid = !isNaN(minDiv) && !isNaN(maxDiv) && minDiv > 0 && maxDiv > 0;
 
-        if (invalidDigits.length > 0) {
-            invalidDigits.sort();
-            const msg = `由於除數最小為 ${minDiv}，被除數不能是 ${invalidDigits.join('、')} (數值過小)，請重新選擇被除數位數。`;
-            setErrorModal({ show: true, message: msg });
-            return;
+            if (!isCustomValid) {
+                setErrorModal({ show: true, message: "請輸入完整的除數範圍（最小與最大值皆須填寫且大於0）！" });
+                return;
+            }
+            if (minDiv > maxDiv) {
+                setErrorModal({ show: true, message: `除數範圍錯誤：最小值 (${minDiv}) 不能大於 最大值 (${maxDiv})！` });
+                return;
+            }
+            if (maxDiv > 999) {
+                setErrorModal({ show: true, message: "除數請勿超過 999！" });
+                return;
+            }
+            const invalidDigits = [];
+            config.dividendDigits.forEach(digit => {
+                const maxValOfDigit = Math.pow(10, digit) - 1;
+                if (maxValOfDigit < minDiv) invalidDigits.push(`${digit}位`);
+            });
+            if (invalidDigits.length > 0) {
+                invalidDigits.sort();
+                const msg = `由於除數最小為 ${minDiv}，被除數不能是 ${invalidDigits.join('、')} (數值過小)，請重新選擇被除數位數。`;
+                setErrorModal({ show: true, message: msg });
+                return;
+            }
         }
 
         setProgress({ current: 1, total: config.totalQuestions, score: 0 });
@@ -372,143 +473,152 @@ const MobileDivisionTrainer = () => {
     };
 
     const renderSettings = () => {
+        const levels = ['活動一', '活動二'];
         return (
             <div className="flex flex-col h-full bg-slate-50 overflow-auto p-4 sm:p-8 max-w-lg mx-auto w-full relative">
                 {renderErrorModal()}
 
-                <div className="mb-8 text-center">
+                <div className="mb-6 text-center">
                     <h1 className="text-3xl font-bold text-blue-700 mb-1">長除法訓練器</h1>
-                    <div className="text-sm text-gray-400 mb-3"> by 苗栗公館國小資源班</div>
-                    <p className="text-gray-500">自訂測驗內容</p>
+                    <div className="text-sm text-gray-400"> by 苗栗公館國小資源班</div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm p-5 mb-4 border border-gray-100">
-                    <h2 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
-                        <span className="w-1 h-6 bg-blue-500 rounded-full"></span> 被除數位數
-                    </h2>
-                    <div className="flex gap-2">
-                        {[1, 2, 3, 4].map(digit => (
-                            <button
-                                key={digit}
-                                onClick={() => toggleDividendDigit(digit)}
-                                className={`flex-1 py-3 rounded-lg border-2 font-bold transition-all
-                        ${config.dividendDigits.includes(digit)
-                                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                        : 'border-gray-200 text-gray-400 hover:border-gray-300'}`}
-                            >
-                                {digit}位
-                            </button>
+                {/* 模式切換 */}
+                <div className="flex bg-gray-100 rounded-xl p-1 mb-4">
+                    <button
+                        onClick={() => setConfig(prev => ({ ...prev, mode: 'textbook' }))}
+                        className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${config.mode === 'textbook' ? 'bg-white text-blue-700 shadow' : 'text-gray-400'}`}
+                    >
+                        課本進度
+                    </button>
+                    <button
+                        onClick={() => setConfig(prev => ({ ...prev, mode: 'free' }))}
+                        className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${config.mode === 'free' ? 'bg-white text-blue-700 shadow' : 'text-gray-400'}`}
+                    >
+                        自由練習
+                    </button>
+                </div>
+
+                {/* 課本進度模式 */}
+                {config.mode === 'textbook' && (
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-4 overflow-hidden">
+                        <div className="p-4 border-b border-gray-100">
+                            <h2 className="font-bold text-gray-700 flex items-center gap-2">
+                                <span className="w-1 h-6 bg-blue-500 rounded-full"></span>
+                                選擇練習題型
+                            </h2>
+                            <p className="text-xs text-gray-400 mt-1">對應三下數學第二單元除法</p>
+                        </div>
+                        {levels.map(level => (
+                            <div key={level}>
+                                <div className="px-4 py-2 bg-slate-50 text-xs font-bold text-slate-500 border-b border-gray-100">
+                                    {level}：{level === '活動一' ? '二位數除以一位數' : '三位數除以一位數'}
+                                </div>
+                                {TEXTBOOK_ACTIVITIES.filter(a => a.level === level).map((act, idx, arr) => (
+                                    <button
+                                        key={act.id}
+                                        onClick={() => setConfig(prev => ({ ...prev, textbookActivity: act.id }))}
+                                        className={`w-full flex items-center justify-between px-4 py-3 transition-colors ${idx < arr.length - 1 ? 'border-b border-gray-50' : ''} ${config.textbookActivity === act.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
+                                    >
+                                        <div className="text-left">
+                                            <div className={`font-bold text-sm ${config.textbookActivity === act.id ? 'text-blue-700' : 'text-gray-700'}`}>{act.label}</div>
+                                            <div className="text-xs text-gray-400 mt-0.5">{act.example}</div>
+                                        </div>
+                                        {config.textbookActivity === act.id && (
+                                            <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shrink-0 ml-2">
+                                                <Check size={12} className="text-white" />
+                                            </div>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
                         ))}
                     </div>
-                </div>
+                )}
 
-                <div className="bg-white rounded-xl shadow-sm p-5 mb-4 border border-gray-100 transition-all duration-300">
-                    <h2 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
-                        <span className="w-1 h-6 bg-green-500 rounded-full"></span> 除數範圍
-                    </h2>
-
-                    <div className="relative pt-2">
-                        <div className="flex items-center gap-2">
-                            <div className="relative flex-1">
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="999"
-                                    placeholder="最小"
-                                    value={config.customDivisorMin}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        if (val === '' || val.length <= 3) {
-                                            setConfig(prev => ({ ...prev, customDivisorMin: val }));
-                                        }
-                                    }}
-                                    className="w-full p-3 rounded-lg border-2 border-green-500 bg-green-50 text-green-700 text-center text-lg font-bold outline-none shadow-inner transition-all focus:ring-2 focus:ring-green-200"
-                                />
-                                <span className="absolute top-1 left-2 text-[10px] text-green-600 font-bold">Min</span>
-                            </div>
-
-                            <span className="text-gray-400 font-bold">~</span>
-
-                            <div className="relative flex-1">
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="999"
-                                    placeholder="最大"
-                                    value={config.customDivisorMax}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        if (val === '' || val.length <= 3) {
-                                            setConfig(prev => ({ ...prev, customDivisorMax: val }));
-                                        }
-                                    }}
-                                    className="w-full p-3 rounded-lg border-2 border-green-500 bg-green-50 text-green-700 text-center text-lg font-bold outline-none shadow-inner transition-all focus:ring-2 focus:ring-green-200"
-                                />
-                                <span className="absolute top-1 left-2 text-[10px] text-green-600 font-bold">Max</span>
+                {/* 自由練習模式 */}
+                {config.mode === 'free' && (
+                    <>
+                        <div className="bg-white rounded-xl shadow-sm p-5 mb-4 border border-gray-100">
+                            <h2 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
+                                <span className="w-1 h-6 bg-blue-500 rounded-full"></span> 被除數位數
+                            </h2>
+                            <div className="flex gap-2">
+                                {[1, 2, 3, 4].map(digit => (
+                                    <button
+                                        key={digit}
+                                        onClick={() => toggleDividendDigit(digit)}
+                                        className={`flex-1 py-3 rounded-lg border-2 font-bold transition-all ${config.dividendDigits.includes(digit) ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-400 hover:border-gray-300'}`}
+                                    >
+                                        {digit}位
+                                    </button>
+                                ))}
                             </div>
                         </div>
-                    </div>
 
-                    <p className="text-xs text-gray-400 mt-3 text-center">
-                        輸入除數範圍 (1-999)，將於範圍內隨機出題。<br />
-                        若要固定除數，請將最大與最小值設為相同。
-                    </p>
-                </div>
+                        <div className="bg-white rounded-xl shadow-sm p-5 mb-4 border border-gray-100">
+                            <h2 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
+                                <span className="w-1 h-6 bg-green-500 rounded-full"></span> 除數範圍
+                            </h2>
+                            <div className="flex items-center gap-2">
+                                <div className="relative flex-1">
+                                    <input type="number" min="1" max="999" placeholder="最小" value={config.customDivisorMin}
+                                        onChange={(e) => { const v = e.target.value; if (v === '' || v.length <= 3) setConfig(prev => ({ ...prev, customDivisorMin: v })); }}
+                                        className="w-full p-3 rounded-lg border-2 border-green-500 bg-green-50 text-green-700 text-center text-lg font-bold outline-none" />
+                                    <span className="absolute top-1 left-2 text-[10px] text-green-600 font-bold">Min</span>
+                                </div>
+                                <span className="text-gray-400 font-bold">~</span>
+                                <div className="relative flex-1">
+                                    <input type="number" min="1" max="999" placeholder="最大" value={config.customDivisorMax}
+                                        onChange={(e) => { const v = e.target.value; if (v === '' || v.length <= 3) setConfig(prev => ({ ...prev, customDivisorMax: v })); }}
+                                        className="w-full p-3 rounded-lg border-2 border-green-500 bg-green-50 text-green-700 text-center text-lg font-bold outline-none" />
+                                    <span className="absolute top-1 left-2 text-[10px] text-green-600 font-bold">Max</span>
+                                </div>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-3 text-center">
+                                輸入除數範圍 (1-999)，若要固定除數請將最大最小設為相同。
+                            </p>
+                        </div>
 
-                <div className="bg-white rounded-xl shadow-sm p-5 mb-4 border border-gray-100">
-                    <h2 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
-                        <span className="w-1 h-6 bg-purple-500 rounded-full"></span> 餘數設定
-                    </h2>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => setConfig(prev => ({ ...prev, forceInteger: false }))}
-                            className={`flex-1 py-3 rounded-lg border-2 font-bold transition-all
-                    ${!config.forceInteger
-                                    ? 'border-purple-500 bg-purple-50 text-purple-700'
-                                    : 'border-gray-200 text-gray-400'}`}
-                        >
-                            隨機 (可能有餘數)
-                        </button>
-                        <button
-                            onClick={() => setConfig(prev => ({ ...prev, forceInteger: true }))}
-                            className={`flex-1 py-3 rounded-lg border-2 font-bold transition-all
-                    ${config.forceInteger
-                                    ? 'border-purple-500 bg-purple-50 text-purple-700'
-                                    : 'border-gray-200 text-gray-400'}`}
-                        >
-                            必定整除
-                        </button>
-                    </div>
-                </div>
+                        <div className="bg-white rounded-xl shadow-sm p-5 mb-4 border border-gray-100">
+                            <h2 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
+                                <span className="w-1 h-6 bg-purple-500 rounded-full"></span> 餘數設定
+                            </h2>
+                            <div className="flex gap-2">
+                                <button onClick={() => setConfig(prev => ({ ...prev, forceInteger: false }))}
+                                    className={`flex-1 py-3 rounded-lg border-2 font-bold transition-all ${!config.forceInteger ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-400'}`}>
+                                    隨機 (可能有餘數)
+                                </button>
+                                <button onClick={() => setConfig(prev => ({ ...prev, forceInteger: true }))}
+                                    className={`flex-1 py-3 rounded-lg border-2 font-bold transition-all ${config.forceInteger ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-400'}`}>
+                                    必定整除
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )}
 
-                <div className="bg-white rounded-xl shadow-sm p-5 mb-8 border border-gray-100">
+                {/* 測驗題數（兩個模式都顯示） */}
+                <div className="bg-white rounded-xl shadow-sm p-5 mb-6 border border-gray-100">
                     <h2 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
                         <span className="w-1 h-6 bg-orange-500 rounded-full"></span> 測驗題數
                     </h2>
                     <div className="flex gap-2">
                         {[5, 10, 15, 20].map(count => (
-                            <button
-                                key={count}
-                                onClick={() => setConfig(prev => ({ ...prev, totalQuestions: count }))}
-                                className={`flex-1 py-2 rounded-lg border-2 font-bold transition-all
-                        ${config.totalQuestions === count
-                                        ? 'border-orange-500 bg-orange-50 text-orange-700'
-                                        : 'border-gray-200 text-gray-400'}`}
-                            >
+                            <button key={count} onClick={() => setConfig(prev => ({ ...prev, totalQuestions: count }))}
+                                className={`flex-1 py-2 rounded-lg border-2 font-bold transition-all ${config.totalQuestions === count ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-400'}`}>
                                 {count}題
                             </button>
                         ))}
                     </div>
                 </div>
 
-                <button
-                    onClick={startGame}
-                    className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white text-xl font-bold rounded-xl shadow-lg transform active:scale-95 transition-all flex items-center justify-center gap-2"
-                >
+                <button onClick={startGame}
+                    className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white text-xl font-bold rounded-xl shadow-lg transform active:scale-95 transition-all flex items-center justify-center gap-2">
                     <Play fill="currentColor" /> 開始測驗
                 </button>
             </div>
-        )
+        );
     };
 
     const renderSummary = () => {
