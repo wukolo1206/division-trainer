@@ -92,7 +92,8 @@ const MobileDivisionTrainer = () => {
                     break;
                 }
                 case '1-2a': { // 二位數÷一位數（各位均整除，48÷4=12）
-                    divisor = rnd(2, 9);
+                    // 除數5-9時各位可被整除的二位數只有55,66,77,88,99（題目過於單調），故限制在2-4
+                    divisor = rnd(2, 4);
                     const candidates = [];
                     for (let d = 10; d <= 99; d++) {
                         const tens = Math.floor(d / 10), ones = d % 10;
@@ -104,7 +105,8 @@ const MobileDivisionTrainer = () => {
                     break;
                 }
                 case '1-2b': { // 二位數÷一位數（十位有餘再借，72÷3=24）
-                    divisor = rnd(2, 9);
+                    // 除數=9時，唯一的二位數倍數90和99的十位都是9（可被9整除），無合法候選，故排除
+                    divisor = rnd(2, 8);
                     const candidates = [];
                     for (let d = 10; d <= 99; d++) {
                         if (d % divisor === 0 && Math.floor(d / divisor) >= 10 &&
@@ -162,7 +164,19 @@ const MobileDivisionTrainer = () => {
                 default: break;
             }
         }
-        return { dividend: 396, divisor: 3 }; // 保底
+        // 保底：依活動給出合適的預設題目，避免活動一出現三位數
+        const fallbacks = {
+            '1-1': { dividend: 60, divisor: 3 },
+            '1-2a': { dividend: 48, divisor: 4 },
+            '1-2b': { dividend: 72, divisor: 3 },
+            '1-3':  { dividend: 61, divisor: 3 },
+            '2-1':  { dividend: 800, divisor: 4 },
+            '2-2':  { dividend: 396, divisor: 3 },
+            '2-3':  { dividend: 624, divisor: 3 },
+            '2-4':  { dividend: 465, divisor: 5 },
+            '2-5':  { dividend: 809, divisor: 8 },
+        };
+        return fallbacks[activity] || { dividend: 396, divisor: 3 };
     };
 
     // ==========================================
