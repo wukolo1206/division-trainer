@@ -11,7 +11,7 @@ const MobileDivisionTrainer = () => {
     // --- 課本活動定義 ---
     const TEXTBOOK_ACTIVITIES = [
         { id: '1-1',  label: '整十數 ÷ 一位數',              example: '60÷3=20、80÷4=20',  level: '活動一' },
-        { id: '1-2a', label: '二位數 ÷ 一位數（各位均整除）', example: '48÷4=12、36÷3=12',  level: '活動一' },
+        { id: '1-2a', label: '二位數 ÷ 一位數（各位均整除）', example: '68÷2=34、69÷3=23',  level: '活動一' },
         { id: '1-2b', label: '二位數 ÷ 一位數（十位有餘再借）',example: '72÷3=24、91÷7=13', level: '活動一' },
         { id: '1-3',  label: '二位數 ÷ 一位數（有餘數）',     example: '98÷6=16…2',         level: '活動一' },
         { id: '2-1',  label: '整百數 ÷ 一位數',               example: '800÷4=200',         level: '活動二' },
@@ -83,22 +83,26 @@ const MobileDivisionTrainer = () => {
 
         for (let attempts = 0; attempts < 500; attempts++) {
             switch (activity) {
-                case '1-1': { // 整十數÷一位數（60÷3=20，商須為二位數）
-                    divisor = rnd(2, 9);
+                case '1-1': { // 整十數÷一位數：除數須能整除十位數，且十位數≠除數
+                    // 限制除數2-4（5-9時十位數只能是除數本身，違反「十位數≠除數」）
+                    divisor = rnd(2, 4);
                     const opts = [];
-                    for (let d = 20; d <= 90; d += 10)
-                        if (d % divisor === 0 && Math.floor(d / divisor) >= 10) opts.push(d);
+                    for (let d = 20; d <= 90; d += 10) {
+                        const tens = d / 10;
+                        if (tens % divisor === 0 && tens !== divisor) opts.push(d);
+                    }
                     if (opts.length > 0) return { dividend: opts[rnd(0, opts.length - 1)], divisor };
                     break;
                 }
-                case '1-2a': { // 二位數÷一位數（各位均整除，48÷4=12）
-                    // 除數5-9時各位可被整除的二位數只有55,66,77,88,99（題目過於單調），故限制在2-4
+                case '1-2a': { // 二位數÷一位數（各位均整除）：除數須整除各位數，且十位數≠除數
+                    // 限制除數2-4（5-9時十位數只能是除數本身，違反「十位數≠除數」）
                     divisor = rnd(2, 4);
                     const candidates = [];
                     for (let d = 10; d <= 99; d++) {
                         const tens = Math.floor(d / 10), ones = d % 10;
                         if (d % divisor === 0 && Math.floor(d / divisor) >= 10 &&
-                            tens % divisor === 0 && ones % divisor === 0 && ones !== 0)
+                            tens % divisor === 0 && ones % divisor === 0 &&
+                            ones !== 0 && tens !== divisor)
                             candidates.push(d);
                     }
                     if (candidates.length > 0) return { dividend: candidates[rnd(0, candidates.length - 1)], divisor };
