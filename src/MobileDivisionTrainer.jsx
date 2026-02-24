@@ -10,14 +10,15 @@ const MobileDivisionTrainer = () => {
 
     // --- 課本活動定義 ---
     const TEXTBOOK_ACTIVITIES = [
-        { id: '1-1', label: '整十數 ÷ 一位數',         example: '60÷3、80÷4',    level: '活動一' },
-        { id: '1-2', label: '二位數 ÷ 一位數（整除）', example: '48÷4=12',       level: '活動一' },
-        { id: '1-3', label: '二位數 ÷ 一位數（有餘數）',example: '98÷6=16…2',   level: '活動一' },
-        { id: '2-1', label: '整百數 ÷ 一位數',         example: '800÷4=200',     level: '活動二' },
-        { id: '2-2', label: '三位數 ÷ 一位數（商三位）',example: '396÷3=132',   level: '活動二' },
-        { id: '2-3', label: '商中間有 0',               example: '624÷3=208',    level: '活動二' },
-        { id: '2-4', label: '商為二位數',               example: '465÷5=93',     level: '活動二' },
-        { id: '2-5', label: '三位數 ÷ 一位數（有餘數）',example: '809÷8=101…1', level: '活動二' },
+        { id: '1-1',  label: '整十數 ÷ 一位數',              example: '60÷3=20、80÷4=20',  level: '活動一' },
+        { id: '1-2a', label: '二位數 ÷ 一位數（各位均整除）', example: '48÷4=12、36÷3=12',  level: '活動一' },
+        { id: '1-2b', label: '二位數 ÷ 一位數（十位有餘再借）',example: '72÷3=24、91÷7=13', level: '活動一' },
+        { id: '1-3',  label: '二位數 ÷ 一位數（有餘數）',     example: '98÷6=16…2',         level: '活動一' },
+        { id: '2-1',  label: '整百數 ÷ 一位數',               example: '800÷4=200',         level: '活動二' },
+        { id: '2-2',  label: '三位數 ÷ 一位數（商三位）',     example: '396÷3=132',         level: '活動二' },
+        { id: '2-3',  label: '商中間有 0',                    example: '624÷3=208',         level: '活動二' },
+        { id: '2-4',  label: '商為二位數',                    example: '465÷5=93',          level: '活動二' },
+        { id: '2-5',  label: '三位數 ÷ 一位數（有餘數）',     example: '809÷8=101…1',       level: '活動二' },
     ];
 
     // --- 設定選項（從 localStorage 讀取） ---
@@ -82,23 +83,35 @@ const MobileDivisionTrainer = () => {
 
         for (let attempts = 0; attempts < 500; attempts++) {
             switch (activity) {
-                case '1-1': { // 整十數÷一位數（60÷3=20）
+                case '1-1': { // 整十數÷一位數（60÷3=20，商須為二位數）
                     divisor = rnd(2, 9);
                     const opts = [];
                     for (let d = 20; d <= 90; d += 10)
-                        if (d % divisor === 0) opts.push(d);
+                        if (d % divisor === 0 && Math.floor(d / divisor) >= 10) opts.push(d);
                     if (opts.length > 0) return { dividend: opts[rnd(0, opts.length - 1)], divisor };
                     break;
                 }
-                case '1-2': { // 二位數÷一位數（整除，商≥10）
+                case '1-2a': { // 二位數÷一位數（各位均整除，48÷4=12）
                     divisor = rnd(2, 9);
-                    const minD = 10 * divisor;
-                    if (minD > 99) break;
-                    const start = Math.ceil(minD / divisor) * divisor;
-                    const end = Math.floor(99 / divisor) * divisor;
-                    if (start > end) break;
-                    dividend = start + rnd(0, Math.floor((end - start) / divisor)) * divisor;
-                    if (Math.floor(dividend / divisor) >= 10) return { dividend, divisor };
+                    const candidates = [];
+                    for (let d = 10; d <= 99; d++) {
+                        const tens = Math.floor(d / 10), ones = d % 10;
+                        if (d % divisor === 0 && Math.floor(d / divisor) >= 10 &&
+                            tens % divisor === 0 && ones % divisor === 0 && ones !== 0)
+                            candidates.push(d);
+                    }
+                    if (candidates.length > 0) return { dividend: candidates[rnd(0, candidates.length - 1)], divisor };
+                    break;
+                }
+                case '1-2b': { // 二位數÷一位數（十位有餘再借，72÷3=24）
+                    divisor = rnd(2, 9);
+                    const candidates = [];
+                    for (let d = 10; d <= 99; d++) {
+                        if (d % divisor === 0 && Math.floor(d / divisor) >= 10 &&
+                            Math.floor(d / 10) % divisor !== 0)
+                            candidates.push(d);
+                    }
+                    if (candidates.length > 0) return { dividend: candidates[rnd(0, candidates.length - 1)], divisor };
                     break;
                 }
                 case '1-3': { // 二位數÷一位數（有餘數，商≥10）
@@ -501,38 +514,30 @@ const MobileDivisionTrainer = () => {
 
                 {/* 課本進度模式 */}
                 {config.mode === 'textbook' && (
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-4 overflow-hidden">
-                        <div className="p-4 border-b border-gray-100">
-                            <h2 className="font-bold text-gray-700 flex items-center gap-2">
-                                <span className="w-1 h-6 bg-blue-500 rounded-full"></span>
-                                選擇練習題型
-                            </h2>
-                            <p className="text-xs text-gray-400 mt-1">對應三下數學第二單元除法</p>
-                        </div>
-                        {levels.map(level => (
-                            <div key={level}>
-                                <div className="px-4 py-2 bg-slate-50 text-xs font-bold text-slate-500 border-b border-gray-100">
-                                    {level}：{level === '活動一' ? '二位數除以一位數' : '三位數除以一位數'}
-                                </div>
-                                {TEXTBOOK_ACTIVITIES.filter(a => a.level === level).map((act, idx, arr) => (
-                                    <button
-                                        key={act.id}
-                                        onClick={() => setConfig(prev => ({ ...prev, textbookActivity: act.id }))}
-                                        className={`w-full flex items-center justify-between px-4 py-3 transition-colors ${idx < arr.length - 1 ? 'border-b border-gray-50' : ''} ${config.textbookActivity === act.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
-                                    >
-                                        <div className="text-left">
-                                            <div className={`font-bold text-sm ${config.textbookActivity === act.id ? 'text-blue-700' : 'text-gray-700'}`}>{act.label}</div>
-                                            <div className="text-xs text-gray-400 mt-0.5">{act.example}</div>
-                                        </div>
-                                        {config.textbookActivity === act.id && (
-                                            <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shrink-0 ml-2">
-                                                <Check size={12} className="text-white" />
-                                            </div>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        ))}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-4 p-5">
+                        <h2 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
+                            <span className="w-1 h-6 bg-blue-500 rounded-full"></span>
+                            選擇練習題型
+                        </h2>
+                        <select
+                            value={config.textbookActivity}
+                            onChange={(e) => setConfig(prev => ({ ...prev, textbookActivity: e.target.value }))}
+                            className="w-full p-3 rounded-lg border-2 border-blue-300 bg-blue-50 text-blue-700 font-bold text-sm outline-none cursor-pointer"
+                        >
+                            {levels.map(level => (
+                                <optgroup key={level} label={`${level}：${level === '活動一' ? '二位數除以一位數' : '三位數除以一位數'}`}>
+                                    {TEXTBOOK_ACTIVITIES.filter(a => a.level === level).map(a => (
+                                        <option key={a.id} value={a.id}>{a.label}</option>
+                                    ))}
+                                </optgroup>
+                            ))}
+                        </select>
+                        {(() => {
+                            const selected = TEXTBOOK_ACTIVITIES.find(a => a.id === config.textbookActivity);
+                            return selected ? (
+                                <p className="text-xs text-gray-400 mt-2">例：{selected.example}</p>
+                            ) : null;
+                        })()}
                     </div>
                 )}
 
