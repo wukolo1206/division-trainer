@@ -10,15 +10,15 @@ const MobileDivisionTrainer = () => {
 
     // --- 課本活動定義 ---
     const TEXTBOOK_ACTIVITIES = [
-        { id: '1-1',  label: '整十數 ÷ 一位數',              example: '60÷3=20、80÷4=20',  level: '活動一' },
-        { id: '1-2a', label: '二位數 ÷ 一位數（各位均整除）', example: '68÷2=34、69÷3=23',  level: '活動一' },
-        { id: '1-2b', label: '二位數 ÷ 一位數（十位有餘再借）',example: '72÷3=24、91÷7=13', level: '活動一' },
-        { id: '1-3',  label: '二位數 ÷ 一位數（有餘數）',     example: '98÷6=16…2',         level: '活動一' },
-        { id: '2-1',  label: '整百數 ÷ 一位數',               example: '800÷4=200',         level: '活動二' },
-        { id: '2-2',  label: '三位數 ÷ 一位數（商三位）',     example: '396÷3=132',         level: '活動二' },
-        { id: '2-3',  label: '商中間有 0',                    example: '624÷3=208',         level: '活動二' },
-        { id: '2-4',  label: '商為二位數',                    example: '465÷5=93',          level: '活動二' },
-        { id: '2-5',  label: '三位數 ÷ 一位數（有餘數）',     example: '809÷8=101…1',       level: '活動二' },
+        { id: '1-1', label: '整十數 ÷ 一位數', example: '60÷3=20、80÷4=20', level: '活動一' },
+        { id: '1-2a', label: '二位數 ÷ 一位數（各位均整除）', example: '68÷2=34、69÷3=23', level: '活動一' },
+        { id: '1-2b', label: '二位數 ÷ 一位數（十位有餘再借）', example: '72÷3=24、91÷7=13', level: '活動一' },
+        { id: '1-3', label: '二位數 ÷ 一位數（有餘數）', example: '98÷6=16…2', level: '活動一' },
+        { id: '2-1', label: '整百數 ÷ 一位數', example: '800÷4=200', level: '活動二' },
+        { id: '2-2', label: '商是三位數（各位非0）', example: '396÷3=132', level: '活動二' },
+        { id: '2-3', label: '商是三位數（十位是0）', example: '624÷3=208', level: '活動二' },
+        { id: '2-4', label: '商為二位數', example: '465÷5=93', level: '活動二' },
+        { id: '2-5', label: '三位數 ÷ 一位數（有餘數）', example: '809÷8=101…1', level: '活動二' },
     ];
 
     // --- 設定選項（從 localStorage 讀取） ---
@@ -37,7 +37,7 @@ const MobileDivisionTrainer = () => {
                     customDivisorMax: data.customDivisorMax || '9',
                 };
             }
-        } catch (e) {}
+        } catch (e) { }
         return {
             mode: 'textbook',
             textbookActivity: '1-1',
@@ -131,22 +131,31 @@ const MobileDivisionTrainer = () => {
                     if (dividend % divisor !== 0 && Math.floor(dividend / divisor) >= 10) return { dividend, divisor };
                     break;
                 }
-                case '2-1': { // 整百數÷一位數（800÷4=200）
-                    divisor = rnd(2, 9);
+                case '2-1': { // 整百數÷一位數
+                    // 規則：除數可以整除被除數的百位，且被除數的百位和除數不能一樣
+                    divisor = rnd(2, 4); // 限制 2-4
                     const opts = [];
                     for (let h = 1; h <= 9; h++)
-                        if ((h * 100) % divisor === 0) opts.push(h * 100);
+                        if (h % divisor === 0 && h !== divisor) opts.push(h * 100);
                     if (opts.length > 0) return { dividend: opts[rnd(0, opts.length - 1)], divisor };
                     break;
                 }
-                case '2-2': { // 三位數÷一位數（商三位，各位非0，整除）
-                    divisor = rnd(2, 9);
-                    const q = rnd(1, 9) * 100 + rnd(1, 9) * 10 + rnd(1, 9);
-                    dividend = q * divisor;
-                    if (dividend >= 100 && dividend <= 999) return { dividend, divisor };
+                case '2-2': { // 三位數÷一位數（商三位，各位非0，每一位都能除）
+                    divisor = rnd(2, 4); // 限制 2-4，較容易有符合的各個位數
+                    const candidates = [];
+                    for (let i = 1; i <= 9; i++) {
+                        if (i % divisor === 0) candidates.push(i);
+                    }
+                    if (candidates.length > 0) {
+                        const h = candidates[rnd(0, candidates.length - 1)];
+                        const t = candidates[rnd(0, candidates.length - 1)];
+                        const o = candidates[rnd(0, candidates.length - 1)];
+                        dividend = h * 100 + t * 10 + o;
+                        return { dividend, divisor };
+                    }
                     break;
                 }
-                case '2-3': { // 商中間有0（624÷3=208，809÷8=101…1）
+                case '2-3': { // 商是三位數，商的中間的十位數是0
                     divisor = rnd(2, 9);
                     const q = rnd(1, 9) * 100 + rnd(1, 9); // 格式 X0Y
                     const remainder = rnd(0, divisor - 1);
@@ -176,12 +185,12 @@ const MobileDivisionTrainer = () => {
             '1-1': { dividend: 60, divisor: 3 },
             '1-2a': { dividend: 48, divisor: 4 },
             '1-2b': { dividend: 72, divisor: 3 },
-            '1-3':  { dividend: 61, divisor: 3 },
-            '2-1':  { dividend: 800, divisor: 4 },
-            '2-2':  { dividend: 396, divisor: 3 },
-            '2-3':  { dividend: 624, divisor: 3 },
-            '2-4':  { dividend: 465, divisor: 5 },
-            '2-5':  { dividend: 809, divisor: 8 },
+            '1-3': { dividend: 61, divisor: 3 },
+            '2-1': { dividend: 800, divisor: 4 },
+            '2-2': { dividend: 396, divisor: 3 },
+            '2-3': { dividend: 624, divisor: 3 },
+            '2-4': { dividend: 465, divisor: 5 },
+            '2-5': { dividend: 809, divisor: 8 },
         };
         return fallbacks[activity] || { dividend: 396, divisor: 3 };
     };
