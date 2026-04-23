@@ -535,7 +535,8 @@ const MobileDivisionTrainer = () => {
 
                 <div className="mb-6 text-center">
                     <h1 className="text-3xl font-bold text-blue-700 mb-1">長除法訓練器</h1>
-                    <div className="text-sm text-gray-400"> by 苗栗公館國小資源班</div>
+                    <div className="text-sm text-gray-400">修改自苗栗陳東甫老師的程式</div>
+                    <div className="text-xs text-gray-300 mt-0.5">by 苗栗公館國小資源班</div>
                 </div>
 
                 {/* 模式切換 */}
