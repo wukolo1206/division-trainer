@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>圓規練習</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+      background: linear-gradient(160deg, #e8f4fd 0%, #fce8f3 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 10px 28px;
+      gap: 9px;
+    }
+    h1 { font-size: 1.5rem; color: #1a5fa8; }
+
+    .nav-link {
+      font-size: 0.9rem; color: #1a5fa8; text-decoration: none;
+      background: #e8f4fd; padding: 4px 14px; border-radius: 20px;
+      border: 1px solid #b0c8e8;
+    }
+
+    .q-row {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 0.9rem; color: #666;
+    }
+    .stars { display: flex; gap: 4px; font-size: 1.3rem; }
+
+    .card {
+      background: #fff; border-radius: 16px; padding: 11px 18px;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.10);
+      width: 100%; max-width: 340px; text-align: center;
+    }
+    .inst-main { font-size: 1.1rem; color: #222; line-height: 1.5; }
+    .inst-main em { color: #d63f00; font-style: normal; font-weight: bold; }
+    .inst-sub  { font-size: 0.9rem; color: #888; margin-top: 3px; }
+
+    canvas {
+      display: block; border: 2px solid #b0c8e8; border-radius: 12px;
+      background: #fff; touch-action: none;
+    }
+
+    /* 進度條 */
+    .prog-wrap {
+      width: 100%; max-width: 340px; height: 14px;
+      background: #ddeeff; border-radius: 7px; overflow: hidden;
+    }
+    .prog-bar {
+      height: 100%; background: #1a5fa8; border-radius: 7px;
+      transition: width .12s;
+    }
+
+    /* 完成卡 */
+    .done-card {
+      background: #fff; border-radius: 16px; padding: 14px 20px;
+      box-shadow: 0 3px 14px rgba(0,0,0,0.12);
+      width: 100%; max-width: 340px; text-align: center;
+      animation: slideUp .4s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(16px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    .done-card .big { font-size: 2.2rem; }
+    .done-card h2   { font-size: 1.15rem; color: #27ae60; margin: 6px 0 4px; }
+    .done-card .formula {
+      font-size: 1rem; font-weight: bold; color: #1a5fa8;
+      background: #eef5ff; border-radius: 8px;
+      padding: 5px 12px; display: inline-block; margin: 5px 0;
+    }
+
+    .btn {
+      border: none; border-radius: 10px; padding: 9px 24px;
+      font-size: 1rem; cursor: pointer; color: #fff; margin-top: 8px;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-blue  { background: #1a5fa8; }
+    .btn-green { background: #27ae60; }
+  </style>
+</head>
+<body>
+
+<h1>🧭 圓規練習</h1>
+<a class="nav-link" href="index.html">← 圓的秘密</a>
+
+<div class="q-row">
+  <span id="qCount">第 1 題，共 5 題</span>
+  <div class="stars" id="stars"></div>
+</div>
+
+<div class="card">
+  <div class="inst-main" id="instMain">—</div>
+  <div class="inst-sub"  id="instSub">—</div>
+</div>
+
+<canvas id="canvas" width="320" height="320"></canvas>
+
+<div class="prog-wrap" id="progWrap" style="visibility:hidden">
+  <div class="prog-bar" id="progBar" style="width:0%"></div>
+</div>
+
+<div id="doneCard" style="display:none"></div>
+
+<script>
+// ── 常數 ──────────────────────────────────────────────────────
+const SCALE        = 32;    // px per cm
+const W            = 320;
+const CENTER       = { x: W / 2, y: W / 2 };
+const PIVOT_DIST   = 58;    // 樞紐距圓心 px
+const TOL_CM       = 0.45;  // 半徑容許誤差 cm
+const DONE_DEG     = 320;   // 覆蓋幾度算完成
+
+const questions = [
+  { type: 'radius',   value: 2 },
+  { type: 'radius',   value: 3 },
+  { type: 'diameter', value: 6 },
+  { type: 'radius',   value: 4 },
+  { type: 'diameter', value: 8 },
+];
+
+// offscreen canvas：累積筆跡
+const arcCvs = document.createElement('canvas');
+arcCvs.width = W; arcCvs.height = W;
+const arcCtx = arcCvs.getContext('2d');
+
+// ── 狀態 ──────────────────────────────────────────────────────
+let qIdx       = 0;
+let scores     = new Array(questions.length).fill(null);
+let phase      = 'aim';   // aim | trace | done
+let targetR    = 0;       // 目標半徑 px
+let isDragging = false;
+let dragPos    = null;    // 目前手指/滑鼠位置
+let lastPos    = null;    // trace 時的上一個位置（用於持續顯示）
+
+// aim phase
+let aimR       = 0;
+let aimOkTimer = null;
+let aimOk      = false;
+
+// trace phase
+let lastAngle  = null;
+let coverage   = new Set();  // 0-359 degree ints
+
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+
+// ── pointer helpers ───────────────────────────────────────────
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const sx = canvas.width / rect.width;
+  const sy = canvas.height / rect.height;
+  const src = e.touches ? e.touches[0] : e;
+  return {
+    x: (src.clientX - rect.left) * sx,
+    y: (src.clientY - rect.top)  * sy,
+  };
+}
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+// ── 事件 ──────────────────────────────────────────────────────
+canvas.addEventListener('mousedown',  onDown);
+canvas.addEventListener('mousemove',  onMove);
+canvas.addEventListener('mouseup',    onUp);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); onDown(e); }, { passive: false });
+canvas.addEventListener('touchmove',  e => { e.preventDefault(); onMove(e); }, { passive: false });
+canvas.addEventListener('touchend',   e => { e.preventDefault(); onUp(e);   }, { passive: false });
+
+function onDown(e) {
+  isDragging = true;
+  const pos = getPos(e);
+  dragPos = pos; lastPos = pos;
+  if (phase === 'aim') {
+    aimR = dist(CENTER, pos);
+    checkAim();
+    render();
+  } else if (phase === 'trace') {
+    lastAngle = Math.atan2(pos.y - CENTER.y, pos.x - CENTER.x);
+    render();
+  }
+}
+
+function onMove(e) {
+  if (!isDragging) return;
+  const pos = getPos(e);
+  dragPos = pos;
+
+  if (phase === 'aim') {
+    aimR = dist(CENTER, pos);
+    const cm = (aimR / SCALE).toFixed(1);
+    document.getElementById('instSub').textContent = `圓規開口 = ${cm} 公分`;
+    checkAim();
+    render();
+  } else if (phase === 'trace') {
+    const angle = Math.atan2(pos.y - CENTER.y, pos.x - CENTER.x);
+    if (lastAngle !== null) {
+      paintArc(lastAngle, angle);
+      markCoverage(lastAngle, angle);
+      updateProg();
+    }
+    lastAngle = angle;
+    lastPos   = pos;
+    render();
+  }
+}
+
+function onUp() {
+  isDragging = false;
+  if (phase === 'trace') lastAngle = null;
+}
+
+// ── aim：判斷是否對準目標半徑 ────────────────────────────────
+function checkAim() {
+  const diffCm = Math.abs(aimR - targetR) / SCALE;
+  if (diffCm <= TOL_CM) {
+    if (!aimOk) {
+      aimOk = true;
+      aimOkTimer = setTimeout(confirmAim, 700);
+    }
+  } else {
+    aimOk = false;
+    if (aimOkTimer) { clearTimeout(aimOkTimer); aimOkTimer = null; }
+  }
+}
+
+function confirmAim() {
+  if (phase !== 'aim') return;
+  phase = 'trace';
+  arcCtx.clearRect(0, 0, W, W);
+  coverage.clear();
+  lastAngle  = null;
+  isDragging = false;
+  dragPos    = null;
+  lastPos    = null;
+
+  document.getElementById('progWrap').style.visibility = 'visible';
+  document.getElementById('progBar').style.width = '0%';
+  setInst('現在<em>旋轉圓規</em>，把圓畫出來！', '繞著圓心轉一圈');
+  render();
+}
+
+// ── trace：累積圓弧筆跡 ───────────────────────────────────────
+function paintArc(from, to) {
+  let diff = to - from;
+  while (diff >  Math.PI) diff -= 2 * Math.PI;
+  while (diff < -Math.PI) diff += 2 * Math.PI;
+  if (Math.abs(diff) > 0.45) return; // 跳躍太大就略過
+
+  arcCtx.beginPath();
+  arcCtx.arc(CENTER.x, CENTER.y, targetR, from, to, diff < 0);
+  arcCtx.strokeStyle = '#1a5fa8';
+  arcCtx.lineWidth   = 5;
+  arcCtx.lineCap     = 'round';
+  arcCtx.stroke();
+}
+
+function markCoverage(from, to) {
+  let diff = to - from;
+  while (diff >  Math.PI) diff -= 2 * Math.PI;
+  while (diff < -Math.PI) diff += 2 * Math.PI;
+  const steps = Math.ceil(Math.abs(diff * 180 / Math.PI)) + 2;
+  for (let i = 0; i <= steps; i++) {
+    const a = from + diff * i / steps;
+    coverage.add(Math.round(((a * 180 / Math.PI) + 360) % 360));
+  }
+}
+
+function updateProg() {
+  const pct = Math.min(100, Math.round(coverage.size / 360 * 100));
+  document.getElementById('progBar').style.width = pct + '%';
+  if (coverage.size >= DONE_DEG && phase === 'trace') {
+    setTimeout(completeCircle, 150);
+  }
+}
+
+// ── 圓畫完了 ──────────────────────────────────────────────────
+function completeCircle() {
+  if (phase !== 'trace') return;
+  phase = 'done';
+  scores[qIdx] = true;
+  updateStars();
+
+  // 補全未畫到的缺口
+  arcCtx.beginPath();
+  arcCtx.arc(CENTER.x, CENTER.y, targetR, 0, Math.PI * 2);
+  arcCtx.strokeStyle = '#1a5fa8';
+  arcCtx.lineWidth   = 5;
+  arcCtx.stroke();
+
+  document.getElementById('progBar').style.width = '100%';
+  setInst('🎉 畫好了！', '');
+  showDoneCard();
+  render();
+}
+
+function showDoneCard() {
+  const q    = questions[qIdx];
+  const rCm  = (targetR / SCALE);
+  const dCm  = rCm * 2;
+  const rStr = rCm % 1 === 0 ? rCm.toFixed(0) : rCm.toFixed(1);
+  const dStr = dCm % 1 === 0 ? dCm.toFixed(0) : dCm.toFixed(1);
+  const spec = q.type === 'radius'
+    ? `半徑 ${q.value} 公分的圓`
+    : `直徑 ${q.value} 公分的圓`;
+
+  const card = document.getElementById('doneCard');
+  card.className = 'done-card';
+  card.style.display = 'block';
+  card.innerHTML = `
+    <div class="big">🎊</div>
+    <h2>${spec}，完成！</h2>
+    <div class="formula">半徑 ${rStr} 公分　　直徑 ${dStr} 公分</div>
+    <br>
+    ${qIdx + 1 < questions.length
+      ? `<button class="btn btn-blue" onclick="nextQ()">下一題 →</button>`
+      : `<button class="btn btn-green" onclick="showFinal()">全部完成 🎉</button>`}
+  `;
+}
+
+// ── 流程控制 ──────────────────────────────────────────────────
+function nextQ() {
+  qIdx++;
+  document.getElementById('doneCard').style.display = 'none';
+  document.getElementById('progWrap').style.visibility = 'hidden';
+  loadQuestion();
+}
+
+function loadQuestion() {
+  const q = questions[qIdx];
+  targetR = q.type === 'radius' ? q.value * SCALE : (q.value / 2) * SCALE;
+  phase   = 'aim';
+  aimR    = 0;
+  aimOk   = false;
+  isDragging = false;
+  dragPos = lastPos = null;
+  arcCtx.clearRect(0, 0, W, W);
+  coverage.clear();
+  lastAngle = null;
+
+  document.getElementById('qCount').textContent = `第 ${qIdx + 1} 題，共 ${questions.length} 題`;
+
+  const specText = q.type === 'radius'
+    ? `畫一個<em>半徑 ${q.value} 公分</em>的圓`
+    : `畫一個<em>直徑 ${q.value} 公分</em>的圓`;
+  const hintText = q.type === 'radius'
+    ? `把圓規開口拖曳到 ${q.value} 公分`
+    : `直徑 ${q.value} 公分 → 半徑 = ${q.value / 2} 公分`;
+  setInst(specText, hintText);
+  render();
+}
+
+function showFinal() {
+  document.body.innerHTML = `
+    <div style="text-align:center;padding:40px 20px;
+                font-family:'Microsoft JhengHei',sans-serif">
+      <div style="font-size:3.5rem">🎉</div>
+      <h2 style="color:#1a5fa8;margin:12px 0">全部完成！</h2>
+      <p style="font-size:1.1rem;color:#444">你已經學會用圓規畫圓了！</p>
+      <button onclick="location.reload()"
+              style="margin-top:18px;background:#27ae60;color:#fff;border:none;
+                     border-radius:10px;padding:10px 28px;font-size:1rem;cursor:pointer">
+        再練習一次 🔄
+      </button>
+      <br>
+      <a href="index.html"
+         style="display:inline-block;margin-top:12px;color:#1a5fa8;font-size:0.9rem">
+        ← 回到圓的秘密
+      </a>
+    </div>
+  `;
+}
+
+// ── UI ────────────────────────────────────────────────────────
+function setInst(main, sub) {
+  document.getElementById('instMain').innerHTML = main;
+  document.getElementById('instSub').textContent = sub;
+}
+function updateStars() {
+  document.getElementById('stars').innerHTML = scores.map((s, i) =>
+    `<span>${i > qIdx ? '⬜' : s ? '⭐' : '⬜'}</span>`
+  ).join('');
+}
+
+// ── render ────────────────────────────────────────────────────
+function render() {
+  ctx.clearRect(0, 0, W, W);
+  drawGrid();
+
+  // 目標虛線圓（aim 時顯示）
+  if (phase === 'aim') {
+    ctx.beginPath();
+    ctx.arc(CENTER.x, CENTER.y, targetR, 0, Math.PI * 2);
+    ctx.strokeStyle = '#b8d8f8';
+    ctx.lineWidth   = 10;
+    ctx.setLineDash([10, 7]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // 累積筆跡（trace / done）
+  if (phase === 'trace' || phase === 'done') {
+    ctx.drawImage(arcCvs, 0, 0);
+  }
+
+  // 圓心（針尖）
+  ctx.beginPath();
+  ctx.arc(CENTER.x, CENTER.y, 7, 0, Math.PI * 2);
+  ctx.fillStyle = '#e03060';
+  ctx.fill();
+  ctx.fillStyle = '#e03060';
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('圓心（針尖）', CENTER.x + 10, CENTER.y);
+
+  // 圓規臂
+  const compassPos = phase === 'aim'   ? dragPos :
+                     phase === 'trace' ? (dragPos || lastPos) : null;
+  const compassR   = phase === 'aim'   ? aimR : targetR;
+  if (compassPos && compassR > 8) drawCompass(compassPos, compassR);
+
+  // aim 時的公分提示
+  if (phase === 'aim' && aimR > 10) {
+    const cm     = (aimR / SCALE).toFixed(1);
+    const tCm    = (targetR / SCALE).toFixed(1);
+    const ok     = Math.abs(aimR - targetR) / SCALE <= TOL_CM;
+    const labelY = clamp(CENTER.y + aimR + 20, 30, W - 8);
+    ctx.fillStyle = ok ? '#27ae60' : '#888';
+    ctx.font      = ok ? 'bold 13px sans-serif' : '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(ok ? `✓ ${cm} 公分！準備好了⋯` : `目前 ${cm} 公分（目標 ${tCm}）`,
+                 CENTER.x, labelY);
+  }
+}
+
+function drawGrid() {
+  ctx.strokeStyle = '#ddeeff';
+  ctx.lineWidth   = 1;
+  for (let i = 0; i <= 10; i++) {
+    ctx.beginPath(); ctx.moveTo(i * SCALE, 0); ctx.lineTo(i * SCALE, W); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i * SCALE); ctx.lineTo(W, i * SCALE); ctx.stroke();
+  }
+}
+
+// ── 圓規 V 形臂 ───────────────────────────────────────────────
+function drawCompass(pos, r_px) {
+  const angle     = Math.atan2(pos.y - CENTER.y, pos.x - CENTER.x);
+  const perpAngle = angle - Math.PI / 2;
+  const pivot = {
+    x: CENTER.x + Math.cos(perpAngle) * PIVOT_DIST,
+    y: CENTER.y + Math.sin(perpAngle) * PIVOT_DIST,
+  };
+  const pencil = {
+    x: CENTER.x + Math.cos(angle) * r_px,
+    y: CENTER.y + Math.sin(angle) * r_px,
+  };
+
+  ctx.lineCap = 'round';
+
+  // 左臂（樞紐 → 針尖/圓心）
+  ctx.beginPath();
+  ctx.moveTo(pivot.x, pivot.y);
+  ctx.lineTo(CENTER.x, CENTER.y);
+  ctx.strokeStyle = '#666'; ctx.lineWidth = 3.5; ctx.stroke();
+
+  // 右臂（樞紐 → 筆尖）
+  ctx.beginPath();
+  ctx.moveTo(pivot.x, pivot.y);
+  ctx.lineTo(pencil.x, pencil.y);
+  ctx.strokeStyle = '#666'; ctx.lineWidth = 3.5; ctx.stroke();
+
+  // 樞紐圓點
+  ctx.beginPath();
+  ctx.arc(pivot.x, pivot.y, 8, 0, Math.PI * 2);
+  ctx.fillStyle = '#444'; ctx.fill();
+
+  // 筆尖圓點（藍色，較大）
+  ctx.beginPath();
+  ctx.arc(pencil.x, pencil.y, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a5fa8'; ctx.fill();
+
+  // 樞紐 label
+  ctx.fillStyle = '#555';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('轉軸',
+    clamp(pivot.x + Math.cos(perpAngle) * 20, 18, W - 36),
+    clamp(pivot.y + Math.sin(perpAngle) * 20, 12, W - 10));
+
+  // 筆尖 label
+  ctx.fillStyle = '#1a5fa8';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.fillText('筆尖',
+    clamp(pencil.x + Math.cos(angle) * 20, 18, W - 28),
+    clamp(pencil.y + Math.sin(angle) * 20, 12, W - 10));
+
+  // aim 時：顯示開口 = 半徑
+  if (phase === 'aim') {
+    const cm   = (r_px / SCALE).toFixed(1);
+    const midX = (CENTER.x + pencil.x) / 2;
+    const midY = (CENTER.y + pencil.y) / 2;
+    const ox   = Math.cos(perpAngle) * 18;
+    const oy   = Math.sin(perpAngle) * 18;
+    ctx.fillStyle = '#c05000';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText(`開口 = 半徑 = ${cm} 公分`,
+      clamp(midX + ox, 50, W - 50),
+      clamp(midY + oy, 12, W - 8));
+  }
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// ── 初始化 ────────────────────────────────────────────────────
+updateStars();
+loadQuestion();
+</script>
+</body>
+</html>

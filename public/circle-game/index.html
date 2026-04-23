@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>圓的秘密</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+      background: linear-gradient(160deg, #e8f4fd 0%, #fce8f3 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 10px 28px;
+      gap: 9px;
+    }
+    h1 { font-size: 1.5rem; color: #1a5fa8; }
+
+    /* 步驟列 */
+    .steps {
+      display: flex;
+      gap: 6px;
+    }
+    .step {
+      border-radius: 20px;
+      padding: 3px 14px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      border: 2px solid #ccc;
+      color: #aaa;
+      transition: all .3s;
+    }
+    .step.active  { background: #1a5fa8; border-color: #1a5fa8; color: #fff; }
+    .step.done    { background: #27ae60; border-color: #27ae60; color: #fff; }
+
+    /* 說明卡 */
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 11px 18px;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.10);
+      width: 100%;
+      max-width: 340px;
+      text-align: center;
+    }
+    .inst-main { font-size: 1.1rem; color: #222; line-height: 1.5; }
+    .inst-main em { color: #d63f00; font-style: normal; font-weight: bold; }
+    .inst-sub  { font-size: 0.9rem; color: #888; margin-top: 3px; }
+
+    /* Canvas */
+    canvas {
+      display: block;
+      border: 2px solid #b0c8e8;
+      border-radius: 12px;
+      background: #fff;
+      touch-action: none;
+    }
+
+    /* 半徑標籤列 */
+    .r-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      justify-content: center;
+      min-height: 36px;
+      width: 100%;
+      max-width: 340px;
+    }
+    .r-tag {
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #fff;
+      animation: popIn .25s ease;
+    }
+    @keyframes popIn {
+      from { transform: scale(0.4); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+
+    /* 發現卡 */
+    .discover-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 14px 20px;
+      box-shadow: 0 3px 14px rgba(0,0,0,0.12);
+      width: 100%;
+      max-width: 340px;
+      text-align: center;
+      display: none;
+      animation: slideUp .4s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(18px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    .discover-card .emoji { font-size: 2rem; }
+    .discover-card h2 { font-size: 1.15rem; margin: 5px 0 4px; color: #27ae60; }
+    .discover-card p  { font-size: 0.95rem; color: #444; line-height: 1.6; }
+    .discover-card .formula {
+      margin: 8px 0 4px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: #1a5fa8;
+      background: #eef5ff;
+      border-radius: 8px;
+      padding: 6px 12px;
+      display: inline-block;
+    }
+
+    /* 按鈕 */
+    .btn {
+      border: none; border-radius: 10px; padding: 9px 24px;
+      font-size: 1rem; cursor: pointer; color: #fff; margin-top: 9px;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-green { background: #27ae60; }
+    .btn-blue  { background: #1a5fa8; }
+    .btn-red   { background: #c0392b; }
+  </style>
+</head>
+<body>
+
+<h1>🔍 圓的秘密</h1>
+<a href="draw.html" style="font-size:0.9rem;color:#1a5fa8;text-decoration:none;background:#e8f4fd;padding:4px 14px;border-radius:20px;border:1px solid #b0c8e8">→ 圓規練習</a>
+
+<div class="steps">
+  <div class="step active" id="s1">① 畫圓</div>
+  <div class="step"        id="s2">② 半徑</div>
+  <div class="step"        id="s3">③ 直徑</div>
+</div>
+
+<div class="card">
+  <div class="inst-main" id="instMain">從<em>中心點</em>往外拖曳，畫一個圓！</div>
+  <div class="inst-sub"  id="instSub">圓規的開口就是半徑</div>
+</div>
+
+<canvas id="canvas" width="320" height="320"></canvas>
+
+<div class="r-tags" id="rTags"></div>
+
+<!-- 半徑發現卡 -->
+<div class="discover-card" id="radiusCard">
+  <div class="emoji">✨</div>
+  <h2 id="radiusTitle">發現了！</h2>
+  <p id="radiusBody">不管點哪裡，到圓心的距離都一樣！</p>
+  <div class="formula" id="radiusFormula">半徑 = ? 公分</div>
+  <button class="btn btn-blue" onclick="startDiameter()">繼續看直徑 →</button>
+</div>
+
+<!-- 直徑發現卡 -->
+<div class="discover-card" id="diamCard">
+  <div class="emoji">🎉</div>
+  <h2>直徑 = 半徑 × 2</h2>
+  <p>直徑是通過圓心、連接圓上兩點的最長線段。<br>它剛好等於<strong>兩個半徑</strong>加起來！</p>
+  <div class="formula" id="diamFormula">直徑 = ? + ? = ? 公分</div>
+  <button class="btn btn-green" onclick="resetAll()">再畫一個圓 🔄</button>
+</div>
+
+<script>
+// ── 常數 ──────────────────────────────────────────────────────
+const SCALE     = 32;   // px per cm
+const W         = 320;
+const CENTER    = { x: W / 2, y: W / 2 };
+const SNAP_MARGIN   = 38;
+const DISCOVERY_N   = 4;
+const PIVOT_DIST    = 60; // 圓規樞紐距圓心距離(px)
+const COLORS    = ['#e03060','#e08000','#27ae60','#1a5fa8','#8833cc','#00aaaa','#dd7700'];
+
+// ── 狀態 ──────────────────────────────────────────────────────
+let phase       = 'draw';  // draw | explore | diameter | done
+let circleR     = 0;
+let isDragging  = false;
+let dragPos     = null;
+let liveR       = 0;
+let radii       = [];
+let diamProg    = 0;  // 0→2，動畫進度
+let animId      = null;
+let diamAngle   = 0;
+let finalDiamAngle = null; // 動畫結束後保存，讓 done 階段繼續顯示
+
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+
+// ── pointer helpers ───────────────────────────────────────────
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const sx = canvas.width / rect.width;
+  const sy = canvas.height / rect.height;
+  const src = e.touches ? e.touches[0] : e;
+  return {
+    x: (src.clientX - rect.left) * sx,
+    y: (src.clientY - rect.top)  * sy,
+  };
+}
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+// ── 事件 ──────────────────────────────────────────────────────
+canvas.addEventListener('mousedown',  onDown);
+canvas.addEventListener('mousemove',  onMove);
+canvas.addEventListener('mouseup',    onUp);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); onDown(e); }, { passive: false });
+canvas.addEventListener('touchmove',  e => { e.preventDefault(); onMove(e); }, { passive: false });
+canvas.addEventListener('touchend',   e => { e.preventDefault(); onUp(e);   }, { passive: false });
+
+function onDown(e) {
+  const pos = getPos(e);
+  if (phase === 'draw') {
+    isDragging = true; dragPos = pos;
+    liveR = dist(CENTER, pos);
+    render();
+  } else if (phase === 'explore') {
+    addRadius(pos);
+  }
+}
+function onMove(e) {
+  if (!isDragging || phase !== 'draw') return;
+  dragPos = getPos(e);
+  liveR = dist(CENTER, dragPos);
+  // 即時更新說明卡
+  const cm = (liveR / SCALE).toFixed(1);
+  document.getElementById('instSub').textContent = `圓規開口 = 半徑 = ${cm} 公分`;
+  render();
+}
+function onUp(e) {
+  if (!isDragging) return;
+  isDragging = false;
+  if (phase !== 'draw' || liveR < SCALE * 0.8) { liveR = 0; dragPos = null; render(); return; }
+  circleR = liveR;
+  phase = 'explore';
+  dragPos = null;
+  updateSteps();
+  setInst('點一點<em>圓的邊緣</em>，看看半徑是幾公分？', `再點 ${DISCOVERY_N} 次`);
+  render();
+}
+
+// ── 探索半徑 ──────────────────────────────────────────────────
+function addRadius(pos) {
+  if (phase !== 'explore') return;
+  const d = dist(CENTER, pos);
+  if (d > circleR + SNAP_MARGIN || d < 5) return;
+
+  const angle    = Math.atan2(pos.y - CENTER.y, pos.x - CENTER.x);
+  const angleDeg = ((angle * 180 / Math.PI) + 360) % 360;
+
+  // 避免太接近已有的角度
+  if (radii.some(r => Math.abs(r.angleDeg - angleDeg) < 18)) return;
+
+  const r_cm  = parseFloat((circleR / SCALE).toFixed(1));
+  const color = COLORS[radii.length % COLORS.length];
+  radii.push({ angle, angleDeg, r_cm, color });
+
+  addTag(r_cm, color);
+  const left = DISCOVERY_N - radii.length;
+  if (left > 0) {
+    setInst('點一點<em>圓的邊緣</em>，看看半徑是幾公分？', `再點 ${left} 次`);
+  }
+  render();
+
+  if (radii.length >= DISCOVERY_N) setTimeout(showRadiusDiscovery, 400);
+}
+
+function addTag(r_cm, color) {
+  const el = document.createElement('div');
+  el.className = 'r-tag';
+  el.style.background = color;
+  el.textContent = `半徑 ${r_cm} 公分`;
+  document.getElementById('rTags').appendChild(el);
+}
+
+function showRadiusDiscovery() {
+  const r = radii[0].r_cm;
+  document.getElementById('radiusTitle').textContent = `量了 ${radii.length} 次，每次都一樣！`;
+  document.getElementById('radiusBody').textContent  =
+    '不管點圓上哪個地方，到圓心的距離都相等。這個距離就叫做「半徑」！';
+  document.getElementById('radiusFormula').textContent = `半徑 = ${r} 公分`;
+  document.getElementById('radiusCard').style.display = 'block';
+  setInst('✨ 所有半徑<em>都一樣長</em>！', '');
+}
+
+// ── 直徑動畫 ──────────────────────────────────────────────────
+function startDiameter() {
+  document.getElementById('radiusCard').style.display = 'none';
+  document.getElementById('rTags').innerHTML = '';
+  phase    = 'diameter';
+  diamProg = 0;
+  diamAngle = radii.length > 0 ? radii[0].angle : 0;
+  updateSteps();
+  setInst('看！半徑延伸穿過圓心，到圓的另一邊⋯', '這就叫做直徑');
+
+  function tick() {
+    diamProg = Math.min(diamProg + 0.022, 2);
+    render();
+    if (diamProg < 2) {
+      animId = requestAnimationFrame(tick);
+    } else {
+      showDiameterDiscovery();
+    }
+  }
+  animId = requestAnimationFrame(tick);
+}
+
+function showDiameterDiscovery() {
+  finalDiamAngle = diamAngle;
+  phase = 'done';
+  updateSteps();
+  const r = circleR / SCALE;
+  const d = (r * 2).toFixed(1);
+  const rStr = r % 1 === 0 ? r.toFixed(0) : r.toFixed(1);
+  document.getElementById('diamFormula').textContent =
+    `直徑 = ${rStr} + ${rStr} = ${d} 公分`;
+  document.getElementById('diamCard').style.display = 'block';
+  setInst('直徑 = <em>半徑 × 2</em>', '');
+  render();
+}
+
+// ── 重設 ──────────────────────────────────────────────────────
+function resetAll() {
+  if (animId) cancelAnimationFrame(animId);
+  phase     = 'draw';
+  circleR   = liveR = 0;
+  isDragging = false;
+  dragPos   = null;
+  radii     = [];
+  diamProg  = 0;
+  finalDiamAngle = null;
+  document.getElementById('rTags').innerHTML = '';
+  document.getElementById('radiusCard').style.display = 'none';
+  document.getElementById('diamCard').style.display   = 'none';
+  updateSteps();
+  setInst('從<em>中心點</em>往外拖曳，畫一個圓！', '圓規的開口就是半徑');
+  render();
+}
+
+// ── UI helpers ────────────────────────────────────────────────
+function setInst(main, sub) {
+  document.getElementById('instMain').innerHTML = main;
+  document.getElementById('instSub').textContent = sub;
+}
+
+function updateSteps() {
+  const map = { draw: 0, explore: 1, diameter: 2, done: 3 };
+  const idx = map[phase] ?? 0;
+  ['s1','s2','s3'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.className = 'step';
+    if (i < idx)      el.classList.add('done');
+    else if (i === idx && idx < 3) el.classList.add('active');
+  });
+}
+
+// ── 繪製 ──────────────────────────────────────────────────────
+function render() {
+  ctx.clearRect(0, 0, W, W);
+  drawGrid();
+  drawCenterDot();
+
+  const r_px = phase === 'draw' ? liveR : circleR;
+  if (r_px > 4) drawCircle(r_px);
+
+  if (phase === 'draw' && dragPos && liveR > 20) {
+    drawCompass();
+  }
+
+  if (phase === 'explore') {
+    radii.forEach(drawRadius);
+  } else if (phase === 'done') {
+    radii.forEach(drawRadius);
+    if (finalDiamAngle !== null) drawFinalDiameter();
+  } else if (phase === 'diameter') {
+    // 半徑淡顯
+    ctx.globalAlpha = 0.35;
+    radii.forEach(drawRadius);
+    ctx.globalAlpha = 1;
+    drawDiameterAnim();
+  }
+}
+
+function drawGrid() {
+  ctx.strokeStyle = '#ddeeff';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 10; i++) {
+    ctx.beginPath(); ctx.moveTo(i * SCALE, 0); ctx.lineTo(i * SCALE, W); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i * SCALE); ctx.lineTo(W, i * SCALE); ctx.stroke();
+  }
+}
+
+function drawCenterDot() {
+  ctx.beginPath();
+  ctx.arc(CENTER.x, CENTER.y, 7, 0, Math.PI * 2);
+  ctx.fillStyle = '#e03060';
+  ctx.fill();
+  ctx.fillStyle = '#e03060';
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('圓心', CENTER.x + 10, CENTER.y);
+}
+
+function drawCircle(r_px) {
+  ctx.beginPath();
+  ctx.arc(CENTER.x, CENTER.y, r_px, 0, Math.PI * 2);
+  ctx.strokeStyle = '#1a5fa8';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+}
+
+// ── 圓規視覺 ─────────────────────────────────────────────────
+function drawCompass() {
+  const angle = Math.atan2(dragPos.y - CENTER.y, dragPos.x - CENTER.x);
+  // 樞紐：在圓心，沿垂直於拖曳方向 PIVOT_DIST 處
+  const perpAngle = angle - Math.PI / 2;
+  const pivot = {
+    x: CENTER.x + Math.cos(perpAngle) * PIVOT_DIST,
+    y: CENTER.y + Math.sin(perpAngle) * PIVOT_DIST,
+  };
+
+  // 筆尖（貼在圓邊）
+  const r_px = Math.min(liveR, W / 2 - 12);
+  const pencil = {
+    x: CENTER.x + Math.cos(angle) * r_px,
+    y: CENTER.y + Math.sin(angle) * r_px,
+  };
+
+  ctx.lineCap = 'round';
+
+  // 左臂：樞紐 → 針尖（圓心）
+  ctx.beginPath();
+  ctx.moveTo(pivot.x, pivot.y);
+  ctx.lineTo(CENTER.x, CENTER.y);
+  ctx.strokeStyle = '#777';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // 右臂：樞紐 → 筆尖
+  ctx.beginPath();
+  ctx.moveTo(pivot.x, pivot.y);
+  ctx.lineTo(pencil.x, pencil.y);
+  ctx.strokeStyle = '#777';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // 樞紐圓點
+  ctx.beginPath();
+  ctx.arc(pivot.x, pivot.y, 7, 0, Math.PI * 2);
+  ctx.fillStyle = '#555';
+  ctx.fill();
+
+  // 筆尖圓點
+  ctx.beginPath();
+  ctx.arc(pencil.x, pencil.y, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a5fa8';
+  ctx.fill();
+
+  // 樞紐 label（避開邊緣）
+  const pvLabelX = clamp(pivot.x + Math.cos(perpAngle) * 18, 12, W - 40);
+  const pvLabelY = clamp(pivot.y + Math.sin(perpAngle) * 18, 14, W - 10);
+  ctx.fillStyle = '#555';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('轉軸', pvLabelX, pvLabelY);
+
+  // 針尖 label（小，貼在圓心左側）
+  const needleLabelAngle = angle + Math.PI; // 圓心反向
+  ctx.fillStyle = '#e03060';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('針尖', CENTER.x + Math.cos(needleLabelAngle) * 22, CENTER.y + Math.sin(needleLabelAngle) * 22);
+
+  // 筆尖 label
+  const plLabelX = clamp(pencil.x + Math.cos(angle) * 18, 18, W - 30);
+  const plLabelY = clamp(pencil.y + Math.sin(angle) * 18, 12, W - 10);
+  ctx.fillStyle = '#1a5fa8';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('筆尖', plLabelX, plLabelY);
+
+  // 開口標示（橫跨針筆連線中點的橙色箭頭 + 文字）
+  const r_cm = (r_px / SCALE).toFixed(1);
+  const midX = (CENTER.x + pencil.x) / 2;
+  const midY = (CENTER.y + pencil.y) / 2;
+  // 標籤放在連線中點，往垂直方向偏移
+  const offX = Math.cos(perpAngle) * 20;
+  const offY = Math.sin(perpAngle) * 20;
+  const lx = clamp(midX + offX, 40, W - 40);
+  const ly = clamp(midY + offY, 12, W - 8);
+  ctx.fillStyle = '#c05000';
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`開口 = 半徑 = ${r_cm} 公分`, lx, ly);
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// ── 半徑線 ────────────────────────────────────────────────────
+function drawRadius({ angle, r_cm, color }) {
+  const ex = CENTER.x + Math.cos(angle) * circleR;
+  const ey = CENTER.y + Math.sin(angle) * circleR;
+
+  ctx.beginPath();
+  ctx.moveTo(CENTER.x, CENTER.y);
+  ctx.lineTo(ex, ey);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.setLineDash([]);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(ex, ey, 5, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+
+  // 數值標籤（中點附近）
+  const mx = CENTER.x + Math.cos(angle) * circleR * 0.52;
+  const my = CENTER.y + Math.sin(angle) * circleR * 0.52;
+  const ox = Math.cos(angle + Math.PI / 2) * 12;
+  const oy = Math.sin(angle + Math.PI / 2) * 12;
+  ctx.fillStyle = color;
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${r_cm}`, mx + ox, my + oy);
+}
+
+// ── 直徑動畫 ──────────────────────────────────────────────────
+function drawDiameterAnim() {
+  const r_px = circleR;
+  const r_cm = (r_px / SCALE).toFixed(1);
+  const color = '#8833cc';
+
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 3.5;
+  ctx.strokeStyle = color;
+  ctx.setLineDash([]);
+
+  const prog1 = Math.min(diamProg, 1);       // 0→1：從圓心到右側
+  const prog2 = Math.max(diamProg - 1, 0);   // 0→1：從圓心到左側
+
+  const ex1 = CENTER.x + Math.cos(diamAngle)           * r_px * prog1;
+  const ey1 = CENTER.y + Math.sin(diamAngle)           * r_px * prog1;
+  const ex2 = CENTER.x + Math.cos(diamAngle + Math.PI) * r_px * prog2;
+  const ey2 = CENTER.y + Math.sin(diamAngle + Math.PI) * r_px * prog2;
+
+  // 第一段
+  if (prog1 > 0) {
+    ctx.beginPath();
+    ctx.moveTo(CENTER.x, CENTER.y);
+    ctx.lineTo(ex1, ey1);
+    ctx.stroke();
+
+    // 端點
+    ctx.beginPath();
+    ctx.arc(ex1, ey1, 5, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    // 第一段 label：半徑
+    if (prog1 > 0.5) {
+      const mx1 = CENTER.x + Math.cos(diamAngle) * r_px * prog1 * 0.5;
+      const my1 = CENTER.y + Math.sin(diamAngle) * r_px * prog1 * 0.5;
+      ctx.fillStyle = color;
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`半徑 ${r_cm} 公分`, mx1 + Math.cos(diamAngle + Math.PI/2) * 16,
+                                         my1 + Math.sin(diamAngle + Math.PI/2) * 16);
+    }
+  }
+
+  // 第二段
+  if (prog2 > 0) {
+    ctx.beginPath();
+    ctx.moveTo(CENTER.x, CENTER.y);
+    ctx.lineTo(ex2, ey2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(ex2, ey2, 5, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    if (prog2 > 0.5) {
+      const mx2 = CENTER.x + Math.cos(diamAngle + Math.PI) * r_px * prog2 * 0.5;
+      const my2 = CENTER.y + Math.sin(diamAngle + Math.PI) * r_px * prog2 * 0.5;
+      ctx.fillStyle = color;
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`半徑 ${r_cm} 公分`, mx2 + Math.cos(diamAngle - Math.PI/2) * 16,
+                                         my2 + Math.sin(diamAngle - Math.PI/2) * 16);
+    }
+  }
+
+  // 全段完成：顯示直徑總長
+  if (diamProg >= 2) {
+    const d_cm = (circleR / SCALE * 2).toFixed(1);
+    // 直徑標籤放在圓外側
+    const labelAngle = diamAngle + Math.PI / 2;
+    const lx = CENTER.x + Math.cos(labelAngle) * (r_px + 20);
+    const ly = CENTER.y + Math.sin(labelAngle) * (r_px + 20);
+    ctx.fillStyle = '#5500aa';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`直徑 ${d_cm} 公分`, clamp(lx, 50, W - 50), clamp(ly, 12, W - 12));
+  }
+}
+
+// ── 直徑完成態（動畫結束後持續顯示）────────────────────────────
+function drawFinalDiameter() {
+  const r_px  = circleR;
+  const r_cm  = (r_px / SCALE).toFixed(1);
+  const d_cm  = (r_px / SCALE * 2).toFixed(1);
+  const color = '#8833cc';
+  const a     = finalDiamAngle;
+
+  const ex1 = CENTER.x + Math.cos(a) * r_px;
+  const ey1 = CENTER.y + Math.sin(a) * r_px;
+  const ex2 = CENTER.x + Math.cos(a + Math.PI) * r_px;
+  const ey2 = CENTER.y + Math.sin(a + Math.PI) * r_px;
+
+  // 直徑線
+  ctx.beginPath();
+  ctx.moveTo(ex1, ey1);
+  ctx.lineTo(ex2, ey2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // 兩個端點
+  [ex1, ex2].forEach((x, i) => {
+    ctx.beginPath();
+    ctx.arc(x, i === 0 ? ey1 : ey2, 5, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  });
+
+  // 兩段各標「半徑」
+  const perp = a + Math.PI / 2;
+  const px = Math.cos(perp) * 15;
+  const py = Math.sin(perp) * 15;
+  ctx.fillStyle = color;
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(r_cm, clamp((CENTER.x + ex1) / 2 + px, 20, W - 20),
+                     clamp((CENTER.y + ey1) / 2 + py, 10, W - 10));
+  ctx.fillText(r_cm, clamp((CENTER.x + ex2) / 2 + px, 20, W - 20),
+                     clamp((CENTER.y + ey2) / 2 + py, 10, W - 10));
+
+  // 直徑總長
+  const labelAngle = a + Math.PI / 2;
+  ctx.fillStyle = '#5500aa';
+  ctx.font = 'bold 13px sans-serif';
+  ctx.fillText(`直徑 ${d_cm} 公分`,
+    clamp(CENTER.x + Math.cos(labelAngle) * (r_px + 22), 50, W - 50),
+    clamp(CENTER.y + Math.sin(labelAngle) * (r_px + 22), 14, W - 12));
+}
+
+// ── 初始化 ────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
